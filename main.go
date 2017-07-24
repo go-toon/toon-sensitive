@@ -4,6 +4,8 @@ import (
 	"github.com/labstack/echo"
 	"net/http"
 	"toon-sensitive/trie"
+	"github.com/tylerb/graceful"
+	"time"
 )
 
 type respMeta struct {
@@ -24,14 +26,10 @@ type resp struct {
 func main() {
 	e := echo.New()
 
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!\n")
-	})
-
 	e.GET("/", queryWords)
+	e.Server.Addr = ":1323"
 
-	e.Logger.Fatal(e.Start(":1323"))
-
+	graceful.ListenAndServe(e.Server, 5*time.Second)
 }
 
 func queryWords(c echo.Context) error {
