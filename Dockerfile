@@ -1,12 +1,12 @@
 FROM hub.c.163.com/library/golang:1.8.3
 
 # 在容器内创建一个目录来存储我们的应用,使他成为工作目录
-RUN mkdir -p /go/src/toon-web
+RUN mkdir -p /go/src/toon-sensitive
 RUN mkdir -p /go/src/golang.org
-WORKDIR /go/src/toon-web
+WORKDIR /go/src/toon-sensitive
 
 # 复制 toon-web目录到容器中
-COPY . /go/src/toon-web
+COPY . /go/src/toon-sensitive
 
 # 下载并安装第三方依赖到容器中
 RUN git clone https://github.com/golang/net.git $GOPATH/src/github.com/golang/net
