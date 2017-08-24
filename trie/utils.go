@@ -1,22 +1,23 @@
 package trie
 
 import (
-	"path/filepath"
-	"os"
+	"bufio"
 	"fmt"
 	"github.com/labstack/gommon/log"
-	"time"
-	"bufio"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 var blackTrie *Trie
 var whitePrefixTrie *Trie
 var whiteSuffixTrie *Trie
+var noiseWords *Noise
 
 // InitAllTrie 初始化Trie库
-func InitAllTrie()  {
+func InitAllTrie() {
 	BlackTrie()
 	WhitePrefixTrie()
 	WhiteSuffixTrie()
@@ -27,6 +28,7 @@ func BlackTrie() *Trie {
 	if blackTrie == nil {
 		blackTrie = NewTrie()
 		blackTrie.CheckWhiteList = true
+		blackTrie.CheckNoise = true
 
 		loadDict(blackTrie, "add", "./dicts/black/default")
 		loadDict(blackTrie, "del", "./dicts/black/exclude")
@@ -64,6 +66,16 @@ func ClearWhiteSuffixTrie() {
 	whiteSuffixTrie = NewTrie()
 }
 
+func NoiseWords() *Noise {
+	if noiseWords == nil {
+		noiseWords = NewNoise()
+		//initNoise(noiseWords, "./dicts/noise/default.txt")
+		loadNoise(noiseWords, "./dicts/noise")
+
+	}
+	return noiseWords
+}
+
 func loadDict(trieHandle *Trie, op, path string) {
 	var loadAllDictWalk filepath.WalkFunc = func(path string, info os.FileInfo, err error) error {
 		if info == nil {
@@ -84,6 +96,7 @@ func loadDict(trieHandle *Trie, op, path string) {
 	}
 }
 
+// 读取脏词文件，初始化trie树
 func initTrie(trieHandle *Trie, op, path string) (err error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -117,6 +130,60 @@ func initTrie(trieHandle *Trie, op, path string) (err error) {
 			} else if "del" == op {
 				trieHandle.Del(s)
 			}
+		}
+	}
+
+	return
+}
+
+// 加载噪声词
+func loadNoise(noise *Noise, path string) {
+	var loadAllDictWalk filepath.WalkFunc = func(path string, info os.FileInfo, err error) error {
+		if info == nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		initNoise(noise, path)
+
+		return nil
+	}
+
+	err := filepath.Walk(path, loadAllDictWalk)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// initNoise 初始化噪声词库
+func initNoise(noise *Noise, path string) (err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		panic(fmt.Sprintf("failed to open file %s %s", path, err.Error()))
+	}
+
+	defer f.Close()
+
+	log.Printf("%s Load StopWords %s", time.Now().Local().Format("2006-01-02 15:04:05 -0700"), path)
+	buf := bufio.NewReader(f)
+
+	for {
+		line, isPrefix, e := buf.ReadLine()
+		if e != nil {
+			if e != io.EOF {
+				err = e
+			}
+			break
+		}
+
+		if isPrefix {
+			continue
+		}
+
+		if word := string(line); word != "" {
+			noise.Add(word)
 		}
 	}
 

@@ -9,6 +9,7 @@ type Trie struct {
 	Root           *Node
 	Mutex          sync.RWMutex
 	CheckWhiteList bool //是否检查白名单
+	CheckNoise     bool //是否检查噪声词
 }
 
 // Trie 节点
@@ -19,7 +20,8 @@ type Node struct {
 
 // Noise 干扰词
 type Noise struct {
-	StopWords map[rune]string
+	StopWords map[rune]int
+	Mutex     sync.RWMutex
 }
 
 // New Trie returns a Trie tree
@@ -42,8 +44,29 @@ func NewTrieNode() *Node {
 // NewNoise returns a Noise
 func NewNoise() *Noise {
 	n := new(Noise)
+	n.StopWords = make(map[rune]int)
 
 	return n
+}
+
+// Add 添加一个噪声词至系统
+func (n *Noise) Add(keyword string) {
+	chars := []rune(keyword)
+
+	if len(chars) == 0 {
+		return
+	}
+
+	//添加锁
+	n.Mutex.Lock()
+
+	for _, char := range chars {
+		if _, ok := n.StopWords[char]; !ok {
+			n.StopWords[char] = 1
+		}
+	}
+
+	n.Mutex.Unlock()
 }
 
 // Add 添加一个敏感词（utf-8）到Trie树
@@ -135,10 +158,20 @@ func (t *Trie) Query(text string) (bool, []string, string) {
 			continue
 		}
 
+		if t.CheckNoise && t.isInNoiseWords(chars[i]) {
+			//噪声词，直接跳过
+			continue
+		}
+
 		jj = 0
 		node = node.Node[chars[i]]
 
-		for j = i+1; j < l; j++ {
+		for j = i + 1; j < l; j++ {
+			if t.CheckNoise && t.isInNoiseWords(chars[j]) {
+				//噪声词，直接跳过
+				continue
+			}
+
 			if _, ok = node.Node[chars[j]]; !ok {
 				if jj > 0 {
 					if t.CheckWhiteList && t.isInWhiteList(found, chars, i, jj, l) {
@@ -180,8 +213,17 @@ func (t *Trie) Query(text string) (bool, []string, string) {
 	return exist, found, string(chars)
 }
 
+// 检查词是否在噪声词中
+func (t *Trie) isInNoiseWords(rune rune) (inNoiseWords bool) {
+	if _, ok := NoiseWords().StopWords[rune]; ok {
+		inNoiseWords = true
+	}
+	//fmt.Printf("噪声次查询: %d, %s, %t\n", rune, string(rune), inNoiseWords)
+	return inNoiseWords
+}
+
 // 检查词是否在白名单中
-func (t *Trie) isInWhiteList(found []string, chars []rune, i, j, length int) (inWhiteList bool)  {
+func (t *Trie) isInWhiteList(found []string, chars []rune, i, j, length int) (inWhiteList bool) {
 	inWhiteList = t.isInWhitePrefixList(found, chars, i, j, length)
 	if !inWhiteList {
 		inWhiteList = t.isInWhiteSuffixList(found, chars, i, j, length)
@@ -206,7 +248,7 @@ func (t *Trie) isInWhitePrefixList(found []string, chars []rune, i, j, length in
 
 	if exist {
 		tmp := []rune(respChars)
-		if tmp[len(tmp) - 1] == 42 {
+		if tmp[len(tmp)-1] == 42 {
 			inWhiteList = true
 		}
 	}
@@ -226,7 +268,7 @@ func (t *Trie) isInWhiteSuffixList(found []string, chars []rune, i, j, length in
 		suffixPos = length
 	}
 
-	suffixWords := string(chars[j : suffixPos])
+	suffixWords := string(chars[j:suffixPos])
 	exist, _, respChars := WhiteSuffixTrie().Query(suffixWords)
 	if exist {
 		tmp := []rune(respChars)
@@ -262,13 +304,12 @@ func (t *Trie) ReadAll() (words []string) {
 func (t *Trie) cycleRead(node *Node, words []string, parentWord string) []string {
 	for char, n := range node.Node {
 		if n.End {
-			words = append(words, parentWord + string(char))
+			words = append(words, parentWord+string(char))
 		}
 		if len(n.Node) > 0 {
-			words = t.cycleRead(n, words, parentWord + string(char))
+			words = t.cycleRead(n, words, parentWord+string(char))
 		}
 	}
 
 	return words
 }
-

@@ -2,10 +2,10 @@ package main
 
 import (
 	"github.com/labstack/echo"
-	"net/http"
-	"toon-sensitive/trie"
 	"github.com/tylerb/graceful"
+	"net/http"
 	"time"
+	"toon-sensitive/trie"
 )
 
 type respMeta struct {
@@ -28,6 +28,11 @@ func main() {
 
 	e.GET("/", queryWords)
 	e.Server.Addr = ":1323"
+
+	//noise := trie.NoiseWords()
+	//for char, val := range noise.StopWords {
+	//	fmt.Sprintf("%d, %d\n", char, val)
+	//}
 
 	graceful.ListenAndServe(e.Server, 5*time.Second)
 }
