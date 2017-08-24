@@ -17,6 +17,11 @@ type Node struct {
 	End  bool
 }
 
+// Noise 干扰词
+type Noise struct {
+	StopWords map[rune]string
+}
+
 // New Trie returns a Trie tree
 func NewTrie() *Trie {
 	t := new(Trie)
@@ -30,6 +35,13 @@ func NewTrieNode() *Node {
 	n := new(Node)
 	n.Node = make(map[rune]*Node)
 	n.End = false
+
+	return n
+}
+
+// NewNoise returns a Noise
+func NewNoise() *Noise {
+	n := new(Noise)
 
 	return n
 }
